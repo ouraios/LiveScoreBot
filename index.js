@@ -275,7 +275,7 @@ footballLiveScore = {
     computeGoalsString: function (matchIndex = null){
         var finalString = "";
         var currentMatch;
-        if(!this.currentMatch && !matchIndex){
+        if(!this.currentMatches && !matchIndex){
             return "Il n'y a pas de match en cours ! ";
         }
         if(matchIndex){
