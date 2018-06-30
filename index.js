@@ -151,6 +151,10 @@ footballLiveScore = {
                             matchDate.setHours(matchDate.getHours()+2);
                             return (new Date()).toISOString() > matchDate.toISOString()
                         }).length-1;
+                        
+                        if(this.currentMatches.length != 0){
+                            maybeCommand[2] = this.currentMatches[0].index;
+                        }
                     }
                     return this.getMatchStats(maybeCommand[2])
                     break;
