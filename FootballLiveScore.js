@@ -181,7 +181,7 @@ class FootballLiveScore {
     }
     initSlack (slackSigningSecret, slackBotToken){
         this.slackClient = new App({
-            signingSecret: process.env.SLACK_SIGNING_SECRET,
+            signingSecret: slackSigningSecret,
             token: slackBotToken,
         });
         this.slackClient.start(3030).then(() => {
