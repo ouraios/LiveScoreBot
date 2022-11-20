@@ -1,7 +1,3 @@
-const request = require('request-promise');
-const { table } = require('table');
-const Discord = require('discord.js');
-const { RTMClient, WebClient } = require('@slack/client');
 const argv = require('minimist')(process.argv.slice(2));
 const FootballLiveScore = require('./FootballLiveScore')
 
