@@ -9,20 +9,21 @@ class FootballLiveScore {
     currentMatches = [];
     matchIndex = null;
     slackClient = null;
-    slackConversationId = null;
+    slackHookUrl = null;
     discordClient = null;
     discordSubscribesChannels = [];
 
     // INIT
-    start (discordToken, slackSigningSecret, slackBotToken) {
+    start (discordToken, slackSigningSecret, slackBotToken, slackHookUrl) {
         if(slackSigningSecret){
             this.initSlack(slackSigningSecret, slackBotToken);
+            this.slackHookUrl = slackHookUrl;
         }
         if(discordToken){
             this.initDiscord(discordToken);
         }
 
-        got('https://api.fifa.com/api/v3/calendar/matches?language=fr&idCompetition=17&idSeason=255711&idStage=285063&idMatch=400128082&count=400').json()
+        got('https://api.fifa.com/api/v3/calendar/matches?language=fr&idCompetition=17&idSeason=255711&count=400').json()
         .then(data => {
             this.matches = data.Results;
             console.log("Les matchs ont été chargés !");
@@ -54,33 +55,45 @@ class FootballLiveScore {
             }
 
 
-        }, 10000)
+        }, 2000)
     }
 
     // METHODS
     getMatchDetails (index, match){
         got('https://api.fifa.com/api/v3/live/football/17/255711/'+match.IdStage+'/'+match.IdMatch+'?language=fr').json()
         .then(tmpMatch =>{
+            let homeTeamGoalCanceled = false;
+            let awayTeamGoalCanceled = false;
             var goal = false;
             var countryName = "";
             match.MatchTime = tmpMatch.MatchTime;
             this.matches[match.index].MatchTime = tmpMatch.MatchTime;
-            if(tmpMatch.HomeTeam.Goals.length !== match.Home.Goals.length){
+            if(tmpMatch.HomeTeam.Goals.length > match.Home.Goals.length){
                 goal = tmpMatch.HomeTeam.Goals[tmpMatch.HomeTeam.Goals.length-1];
                 goal.countryName = match.Home.TeamName[0].Description;
                 goal.playerName = this.findPlayerName(goal.IdPlayer, tmpMatch);
                 match.Home.Goals.push(goal);
                 match.Home.Score = match.Home.Goals.length;
-            }else if(tmpMatch.AwayTeam.Goals.length !== match.Away.Goals.length){
+            }else if(tmpMatch.AwayTeam.Goals.length > match.Away.Goals.length){
                 goal = tmpMatch.AwayTeam.Goals[tmpMatch.AwayTeam.Goals.length-1];
                 goal.countryName = match.Away.TeamName[0].Description;
                 goal.playerName = this.findPlayerName(goal.IdPlayer, tmpMatch);
                 match.Away.Goals.push(goal);
                 match.Away.Score = match.Away.Goals.length;
+            } else if(tmpMatch.HomeTeam.Goals.length < match.Home.Goals.length){
+                homeTeamGoalCanceled = true;
+                match.Home.Goals.pop();
+                match.Home.Score = match.Home.Goals.length;
+            } else if(tmpMatch.AwayTeam.Goals.length < match.Away.Goals.length){
+                awayTeamGoalCanceled = true;
+                match.Away.Goals.pop();
+                match.Away.Score = match.Away.Goals.length;
             }
             this.currentMatches[index] = match;
             if(goal !== false){
                 this.sendMessage("GOAAAAAAAAAAAAAAAAAAAAL !!!\nBut de " + goal.playerName + " pour " + goal.countryName + " à la  " + goal.Minute +"eme minute !!!\n" + this.computeGoalsString(match.index));
+            }else if(awayTeamGoalCanceled || homeTeamGoalCanceled) {
+                this.sendMessage(`But annulé de ${match[awayTeamGoalCanceled ? 'Away' : 'Home'].TeamName[0].Description} !!!\n${this.computeGoalsString(match.index)}`);
             }
             if(tmpMatch.MatchStatus == 0){
                 this.sendMessage("Match terminé !\nScore final : \n" + this.computeGoalsString(match.index));
@@ -129,11 +142,15 @@ class FootballLiveScore {
                     break;
                 case 'stats':
                     if(!maybeCommand[2]){
-                        maybeCommand[2] = this.matches.filter(match => {
-                            var matchDate = new Date(match.Date);
-                            matchDate.setHours(matchDate.getHours()+2);
-                            return (new Date()).toISOString() > matchDate.toISOString()
-                        }).length-1;
+                        if(this.currentMatches.length > 0){
+                            maybeCommand[2] = this.currentMatches[0].index;
+                        }else {
+                            maybeCommand[2] = this.matches.filter(match => {
+                                var matchDate = new Date(match.Date);
+                                matchDate.setHours(matchDate.getHours() + 2);
+                                return (new Date()).toISOString() > matchDate.toISOString()
+                            }).length - 1;
+                        }
                     }
                     return this.getMatchStats(maybeCommand[2])
                     break;
@@ -179,6 +196,16 @@ class FootballLiveScore {
         this.discordClient.login(discordToken);
 
     }
+
+    sendSlackMessage(message) {
+        got(this.slackHookUrl, {
+            method: 'POST',
+            json: {
+                text: message,
+            },
+        });
+    }
+
     initSlack (slackSigningSecret, slackBotToken){
         this.slackClient = new App({
             signingSecret: slackSigningSecret,
@@ -341,7 +368,7 @@ class FootballLiveScore {
     sendMessage (message, channel = null){
         console.log(message);
         if(this.slackClient !== null){
-            this.slackClient.sendMessage(message, channel ? channel : this.slackConversationId);
+            this.sendSlackMessage(message);
         }
         if(this.discordClient !== null){
             this.discordSubscribesChannels.forEach((channelId) => {

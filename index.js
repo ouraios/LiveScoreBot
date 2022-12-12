@@ -6,9 +6,9 @@ if(!argv.discordToken && !argv.slackSigningSecret){
     process.exit(1);
 }
 
-if(argv.slackSigningSecret &&  !argv.slackBotToken){
+if(argv.slackSigningSecret &&  !argv.slackBotToken && !argv.slackHookUrl){
     console.log("Please provide a slack bot token if you want to use Slack client !");
     process.exit(2);
 }
 const footballLiveScore = new FootballLiveScore();
-footballLiveScore.start(argv.discordToken, argv.slackSigningSecret, argv.slackBotToken);
+footballLiveScore.start(argv.discordToken, argv.slackSigningSecret, argv.slackBotToken, argv.slackHookUrl);
